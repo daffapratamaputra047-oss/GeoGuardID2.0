@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="theme-color" content="#183b31" />
+  <title>GeoGuard ID | Landslide Intelligence</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div class="app-shell">
+    <aside class="sidebar">
+      <div class="brand-block">
+        <div class="brand-icon">⛰️</div>
+        <div>
+          <div class="brand-name">GeoGuard ID</div>
+          <div class="brand-subtitle">Landslide Intelligence</div>
+        </div>
+      </div>
+
+      <section class="sidebar-section">
+        <div class="sidebar-heading">📍 Lokasi pemantauan</div>
+        <form id="location-form" class="search-form">
+          <label class="sr-only" for="location-search">Cari nama lokasi</label>
+          <input id="location-search" type="search" placeholder="Contoh: Kaliangkrik, Magelang" autocomplete="off" />
+          <button class="button button-primary full-width" type="submit">Cari lokasi</button>
+        </form>
+        <p class="sidebar-muted" id="location-message" aria-live="polite">Lokasi awal: Magelang, Jawa Tengah</p>
+        <div class="coordinate-box">
+          <span class="muted-label">LOKASI AKTIF</span>
+          <strong id="active-location">Magelang, Jawa Tengah</strong>
+          <span id="coordinates">-7.47060, 110.21780</span>
+        </div>
+      </section>
+
+      <section class="sidebar-section">
+        <div class="sidebar-heading">🌧️ Data hujan Open-Meteo</div>
+        <button class="button button-outline full-width" id="refresh-rain" type="button">↻ Perbarui data hujan</button>
+        <div class="rain-summary">
+          <span class="muted-label">AKUMULASI HUJAN 24 JAM</span>
+          <strong id="rain-total">Memuat…</strong>
+          <span id="rain-updated" class="sidebar-muted">Menghubungi Open-Meteo</span>
+        </div>
+        <p class="sidebar-footnote">Estimasi model cuaca berdasarkan koordinat, bukan pengukuran penakar hujan lokal.</p>
+      </section>
+
+      <section class="sidebar-section parameter-section">
+        <div class="sidebar-heading">🎛️ Parameter simulasi</div>
+        <div class="control-group">
+          <div class="control-label"><label for="moisture">Indeks kadar air</label><output id="moisture-value">42%</output></div>
+          <input id="moisture" type="range" min="5" max="100" step="1" value="42" />
+        </div>
+        <div class="control-group">
+          <div class="control-label"><label for="slope">Sudut lereng</label><output id="slope-value">32°</output></div>
+          <input id="slope" type="range" min="10" max="60" step="1" value="32" />
+        </div>
+        <div class="control-group">
+          <div class="control-label"><label for="depth">Kedalaman bidang gelincir</label><output id="depth-value">2.0 m</output></div>
+          <input id="depth" type="range" min="0.5" max="8" step="0.1" value="2" />
+        </div>
+        <div class="control-group">
+          <div class="control-label"><label for="cohesion">Kohesi tanah (c)</label><output id="cohesion-value">18 kPa</output></div>
+          <input id="cohesion" type="range" min="1" max="50" step="1" value="18" />
+        </div>
+        <div class="control-group">
+          <div class="control-label"><label for="friction">Sudut geser dalam (φ)</label><output id="friction-value">28°</output></div>
+          <input id="friction" type="range" min="10" max="45" step="1" value="28" />
+        </div>
+        <div class="control-group">
+          <div class="control-label"><label for="unit-weight">Berat isi tanah (γ)</label><output id="unit-weight-value">18 kN/m³</output></div>
+          <input id="unit-weight" type="range" min="14" max="22" step="0.5" value="18" />
+        </div>
+      </section>
+
+      <section class="sidebar-section system-section">
+        <div class="sidebar-heading">📡 Status sistem</div>
+        <p>Curah hujan diambil dari Open-Meteo. Parameter tanah dan sensor lainnya masih berupa simulasi/input pengguna.</p>
+        <p class="sidebar-footnote">Belum terhubung ke ESP32, sensor, relay, atau sirine fisik.</p>
+      </section>
+    </aside>
+
+    <main class="main-content">
+      <header class="hero">
+        <div class="hero-content">
+          <p class="eyebrow">EARTH • WATER • SLOPE MONITORING</p>
+          <h1>⛰️ GeoGuard ID</h1>
+          <p class="hero-description">Intelligent Landslide Monitoring &amp; Early Warning Prototype</p>
+          <span class="hero-tag">ACADEMIC PROTOTYPE</span>
+        </div>
+        <div class="hero-orbit orbit-one"></div>
+        <div class="hero-orbit orbit-two"></div>
+      </header>
+
+      <div class="disclaimer-banner" role="note">
+        <span class="banner-icon">ⓘ</span>
+        <p>Dashboard demonstrasi akademik. Curah hujan bersumber dari Open-Meteo; parameter sensor/lereng, ambang status, dan bentuk longsoran lainnya masih berupa simulasi, bukan pemantauan lapangan.</p>
+      </div>
+
+      <section class="status-heading-row">
+        <div>
+          <p class="section-kicker">KONDISI TERKINI</p>
+          <h2>Status kondisi lereng <span id="status-heading" class="status-text status-normal">NORMAL</span></h2>
+        </div>
+        <div class="active-place"><span>Lokasi aktif</span><strong id="header-location">Magelang, Jawa Tengah</strong></div>
+      </section>
+
+      <section class="metric-grid" aria-label="Ringkasan parameter">
+        <article class="metric-card"><div class="metric-label">FACTOR OF SAFETY</div><div class="metric-value" id="metric-fos">—</div><div class="metric-note">Hasil model simulasi</div></article>
+        <article class="metric-card"><div class="metric-label">CURAH HUJAN</div><div class="metric-value" id="metric-rain">—</div><div class="metric-note">Open-Meteo · estimasi 24 jam</div></article>
+        <article class="metric-card"><div class="metric-label">INDEKS KADAR AIR</div><div class="metric-value" id="metric-moisture">42%</div><div class="metric-note">Input simulasi pengguna</div></article>
+        <article class="metric-card"><div class="metric-label">LAJU PERGESERAN</div><div class="metric-value" id="metric-movement">—</div><div class="metric-note">Nilai ilustratif, bukan sensor</div></article>
+      </section>
+
+      <nav class="tab-bar" aria-label="Navigasi dashboard">
+        <button class="tab-button active" data-tab="dashboard" type="button">📊 Dashboard</button>
+        <button class="tab-button" data-tab="terrain" type="button">🧊 Simulasi 3D</button>
+        <button class="tab-button" data-tab="analysis" type="button">📐 Analisis</button>
+        <button class="tab-button" data-tab="alerts" type="button">🚨 Peringatan</button>
+        <button class="tab-button" data-tab="reports" type="button">📝 Laporan warga</button>
+      </nav>
+
+      <section class="tab-panel active" id="tab-dashboard">
+        <div class="dashboard-grid">
+          <article class="panel map-panel">
+            <div class="panel-heading"><div><p class="section-kicker">GEOGRAFIS</p><h3>Peta lokasi pemantauan</h3></div><span class="panel-icon">📍</span></div>
+            <div id="monitor-map" class="map-container" aria-label="Peta lokasi pemantauan"></div>
+            <p class="small-note">Pin menunjukkan lokasi pencarian, bukan lokasi sensor yang telah dipasang.</p>
+          </article>
+          <article class="panel summary-panel">
+            <div class="panel-heading"><div><p class="section-kicker">RINGKASAN</p><h3>Ringkasan kondisi</h3></div><span class="panel-icon">◈</span></div>
+            <div class="summary-stat"><span>Tekanan air pori estimasi model</span><strong id="pore-pressure">—</strong></div>
+            <div class="summary-stat"><span>Indeks tekanan air simulasi</span><strong id="water-index">—</strong></div>
+            <div class="summary-stat"><span>Sudut lereng</span><strong id="summary-slope">32°</strong></div>
+            <div id="summary-status" class="inline-status normal">Indikator simulasi berada pada kategori Normal.</div>
+          </article>
+        </div>
+        <article class="panel chart-panel">
+          <div class="panel-heading"><div><p class="section-kicker">DATA CUACA</p><h3>Tren curah hujan Open-Meteo 24 jam terakhir</h3></div><span class="chart-unit">mm/jam</span></div>
+          <div id="rain-chart" class="chart-container"></div>
+          <p class="small-note">Grafik memakai variabel rain dari Open-Meteo (estimasi hujan per jam berbasis model cuaca, bukan pengukuran penakar hujan di lokasi).</p>
+        </article>
+        <article class="panel chart-panel">
+          <div class="panel-heading"><div><p class="section-kicker">DATA ILUSTRATIF</p><h3>Indikator simulasi lainnya</h3></div><span class="chart-unit">24 jam</span></div>
+          <div id="trend-chart" class="chart-container"></div>
+        </article>
+      </section>
+
+      <section class="tab-panel" id="tab-terrain">
+        <article class="panel chart-panel">
+          <div class="panel-heading"><div><p class="section-kicker">MODEL TOPOGRAFI</p><h3>Model topografi lereng 3D</h3></div><span class="chart-unit">3D surface</span></div>
+          <div class="deformation-control"><label for="deformation">Tahapan deformasi visual</label><output id="deformation-value">0%</output><input id="deformation" type="range" min="0" max="100" step="5" value="0" /></div>
+          <div id="terrain-chart" class="chart-container terrain-chart"></div>
+          <p class="small-note">Permukaan 3D dan bidang gelincir berwarna merah merupakan geometri sintetis untuk demonstrasi.</p>
+        </article>
+        <article class="panel chart-panel">
+          <div class="panel-heading"><div><p class="section-kicker">PENAMPANG LERENG</p><h3>Penampang lereng dan bidang gelincir</h3></div><span class="chart-unit">Skematis</span></div>
+          <div id="cross-section-chart" class="chart-container"></div>
+          <p class="small-note">Penampang bersifat skematis. Untuk analisis teknik diperlukan geometri dan parameter tanah hasil investigasi.</p>
+        </article>
+      </section>
+
+      <section class="tab-panel" id="tab-analysis">
+        <article class="panel chart-panel">
+          <div class="panel-heading"><div><p class="section-kicker">UJI PARAMETER</p><h3>Analisis sensitivitas faktor keamanan</h3></div><span class="chart-unit">FoS</span></div>
+          <div id="sensitivity-chart" class="chart-container"></div>
+        </article>
+        <article class="panel">
+          <div class="panel-heading"><div><p class="section-kicker">INPUT MODEL</p><h3>Parameter model</h3></div><span class="panel-icon">⚙</span></div>
+          <div class="table-wrap"><table class="data-table"><thead><tr><th>Parameter</th><th>Nilai</th></tr></thead><tbody id="parameter-table"></tbody></table></div>
+          <div class="method-note"><strong>Catatan metodologi</strong><p>Perhitungan ini merupakan model infinite-slope yang disederhanakan. Curah hujan Open-Meteo merupakan estimasi cuaca berbasis model pada koordinat terpilih, sedangkan indeks kadar air bukan pengukuran tekanan pori aktual. Jangan gunakan angka FoS atau ambang aplikasi sebagai dasar keputusan keselamatan lapangan.</p></div>
+        </article>
+      </section>
+
+      <section class="tab-panel" id="tab-alerts">
+        <article class="panel alert-panel">
+          <div class="panel-heading"><div><p class="section-kicker">EARLY WARNING</p><h3>Pusat peringatan dini</h3></div><span class="panel-icon">🚨</span></div>
+          <div id="alert-status-box" class="alert-status-box normal"><span class="alert-status-dot"></span><div><strong id="alert-status-title">NORMAL</strong><p id="alert-status-description">Indikator simulasi berada pada kategori Normal.</p></div></div>
+          <div class="method-note compact"><strong>Informasi penting</strong><p>Peringatan ditampilkan melalui dashboard dan dapat dikirim ke Telegram setelah backend dikonfigurasi. Seluruh indikator pada versi ini masih berupa simulasi.</p></div>
+          <div class="alert-settings">
+            <div><h4>Notifikasi Telegram</h4><p class="small-note">Notifikasi otomatis dikirim ketika status simulasi berubah menjadi Waspada, Siaga 2, atau Bahaya.</p></div>
+            <label class="toggle-control"><input id="telegram-enabled" type="checkbox" /><span class="toggle-track"></span><span>Aktifkan notifikasi Telegram otomatis</span></label>
+            <button class="button button-primary" id="telegram-test" type="button">📨 Tes kirim Telegram</button>
+            <div id="telegram-message" class="form-message" aria-live="polite">Konfigurasi Telegram dibaca dari environment server.</div>
+          </div>
+          <div class="telegram-help"><h4>Konfigurasi Telegram (di server)</h4><p>Isi variabel lingkungan <code>TELEGRAM_BOT_TOKEN</code> dan <code>TELEGRAM_CHAT_ID</code> sebelum menjalankan server. Token tidak disimpan di HTML/JavaScript.</p></div>
+        </article>
+      </section>
+
+      <section class="tab-panel" id="tab-reports">
+        <article class="panel report-panel">
+          <div class="panel-heading"><div><p class="section-kicker">PARTISIPASI WARGA</p><h3>Laporan kondisi lereng dari warga</h3></div><span class="panel-icon">📝</span></div>
+          <form id="report-form" class="report-form">
+            <div class="form-row">
+              <div class="form-field"><label for="reporter">Nama pelapor (opsional)</label><input id="reporter" type="text" placeholder="Nama atau biarkan kosong" maxlength="100" /></div>
+              <div class="form-field"><label for="report-type">Jenis laporan</label><select id="report-type"><option>Retakan tanah</option><option>Longsoran kecil</option><option>Pohon/tiang mulai miring</option><option>Mata air baru</option><option>Pergerakan dinding penahan</option><option>Lainnya</option></select></div>
+            </div>
+            <div class="form-field"><label for="report-description">Deskripsi kondisi</label><textarea id="report-description" rows="4" placeholder="Jelaskan kondisi yang terlihat..." required></textarea></div>
+            <div class="report-actions"><button class="button button-primary" type="submit">Kirim laporan</button><button class="button button-secondary" id="download-reports" type="button" disabled>⬇️ Unduh laporan CSV</button></div>
+            <div id="report-message" class="form-message" aria-live="polite"></div>
+          </form>
+          <div class="report-list-heading"><h4>Daftar laporan sesi ini</h4><span id="report-count" class="count-badge">0 laporan</span></div>
+          <div class="table-wrap"><table class="data-table"><thead><tr><th>Waktu</th><th>Pelapor</th><th>Jenis</th><th>Deskripsi</th></tr></thead><tbody id="reports-table"><tr><td colspan="4" class="empty-state">Belum ada laporan warga.</td></tr></tbody></table></div>
+          <p class="small-note">Laporan tersimpan sementara pada sesi browser ini dan akan hilang ketika halaman dimuat ulang.</p>
+        </article>
+      </section>
+
+      <footer class="footer-note"><strong>GeoGuard ID — Academic Prototype</strong><p>Curah hujan bersumber dari Open-Meteo. Parameter sensor lain, topografi 3D, dan deformasi masih simulasi. Sistem belum terhubung ke perangkat IoT dan belum tervalidasi untuk pemantauan atau peringatan operasional.</p></footer>
+    </main>
+  </div>
+
+  <script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+  <script src="script.js"></script>
+</body>
+</html>
